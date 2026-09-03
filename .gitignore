@@ -1,3 +1,10 @@
+# Python backend
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
 # Logs
 logs
 *.log
@@ -26,6 +33,7 @@ dist-ssr
 # Environment
 .env
 .env.*
+.env.local
 
 # AI / IDE artifacts
 .gemini

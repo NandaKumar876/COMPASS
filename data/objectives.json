@@ -1,0 +1,10 @@
+{
+  "focus_areas": { "education": 1.0, "healthcare": 0.8, "environment": 0.6, "community": 0.5 },
+  "default_weights": {
+    "impact": 0.3,
+    "efficiency": 0.25,
+    "equity": 0.2,
+    "alignment": 0.15,
+    "feasibility": 0.1
+  }
+}
