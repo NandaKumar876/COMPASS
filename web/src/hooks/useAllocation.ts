@@ -11,6 +11,7 @@ export function useAllocation() {
   const [budget, setBudgetState] = useState(DEFAULT_BUDGET);
   const [activePersona, setActivePersona] = useState<PersonaKey | null>(null);
   const [queryResult, setQueryResult] = useState<AllocationResult | null>(null);
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
 
   // Load the canonical proposal set from the backend once on mount.
   // Falls back to the bundled local data if the backend is unreachable,
@@ -19,10 +20,13 @@ export function useAllocation() {
     let cancelled = false;
     getProposals()
       .then((fetched) => {
-        if (!cancelled && fetched.length > 0) setProposals(fetched);
+        if (!cancelled && fetched.length > 0) {
+          setProposals(fetched);
+          setIsBackendConnected(true);
+        }
       })
       .catch(() => {
-        // stay on localProposals
+        // stay on localProposals, isBackendConnected stays false
       });
     return () => {
       cancelled = true;
@@ -61,12 +65,9 @@ export function useAllocation() {
     setQueryResult(allocation);
   }, []);
 
-  const result = serverResult || localResult;
-
   return {
     weights,
     setWeights: updateWeight,
-    setFullWeights: setWeights,
     budget,
     setBudget,
     result,

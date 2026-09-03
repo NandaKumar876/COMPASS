@@ -15,7 +15,6 @@ export default function App() {
   const {
     weights,
     setWeights,
-    setFullWeights,
     budget,
     setBudget,
     result,
