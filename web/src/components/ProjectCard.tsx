@@ -1,11 +1,15 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
-import type { Proposal, Sector } from '../types';
+import { useState, useEffect } from 'react';
+import type { Proposal, Sector, Weights, ExplainResponse } from '../types';
+import { explainProject } from '../api/client';
 
 interface ProjectCardProps {
   proposal: Proposal;
   score: number;
   index: number;
+  weights: Weights;
+  budget: number;
+  allocationState: { funded: string[]; spent: number };
 }
 
 const SECTOR_COLORS: Record<Sector, string> = {
@@ -28,10 +32,33 @@ function formatBudget(n: number): string {
   return `₹${n.toLocaleString('en-IN')}`;
 }
 
-export default function ProjectCard({ proposal, score, index }: ProjectCardProps) {
+type ExplainStatus = 'idle' | 'loading' | 'error';
+
+export default function ProjectCard({
+  proposal,
+  score,
+  index,
+  weights,
+  budget,
+  allocationState,
+}: ProjectCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [explainStatus, setExplainStatus] = useState<ExplainStatus>('idle');
+  const [explanation, setExplanation] = useState<ExplainResponse | null>(null);
   const color = SECTOR_COLORS[proposal.sector];
   const bg = SECTOR_BG[proposal.sector];
+
+  useEffect(() => {
+    if (!expanded || explanation || explainStatus === 'loading') return;
+    setExplainStatus('loading');
+    explainProject(proposal.id, weights, budget, allocationState)
+      .then((res) => {
+        setExplanation(res);
+        setExplainStatus('idle');
+      })
+      .catch(() => setExplainStatus('error'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded]);
 
   return (
     <motion.div
@@ -40,10 +67,10 @@ export default function ProjectCard({ proposal, score, index }: ProjectCardProps
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95, y: -8 }}
       transition={{
-        type: 'spring',
-        stiffness: 500,
-        damping: 35,
-        delay: index * 0.02,
+        opacity: { duration: 0.22, ease: [0.22, 1, 0.36, 1], delay: index * 0.02 },
+        scale: { type: 'spring', stiffness: 500, damping: 35, delay: index * 0.02 },
+        y: { type: 'spring', stiffness: 500, damping: 35, delay: index * 0.02 },
+        layout: { type: 'spring', stiffness: 320, damping: 32 },
       }}
       style={{ borderRadius: 12, overflow: 'hidden' }}
     >
@@ -128,6 +155,25 @@ export default function ProjectCard({ proposal, score, index }: ProjectCardProps
                 ✦ Must-Fund Commitment
               </div>
             )}
+
+            <div className="project-expanded-row" style={{ alignItems: 'flex-start', marginTop: 4 }}>
+              <span className="project-expanded-label">Why</span>
+              <span className="project-expanded-value">
+                {explainStatus === 'loading' && 'Asking the AI layer…'}
+                {explainStatus === 'error' && 'Could not reach the explanation service.'}
+                {explainStatus === 'idle' && explanation && (
+                  <>
+                    {explanation.reason}
+                    {explanation.rescue && (
+                      <div style={{ marginTop: 6, fontWeight: 600, color: 'var(--accent-amber)' }}>
+                        Rescue: drop {explanation.rescue.drop.join(' + ')} or add{' '}
+                        ₹{(explanation.rescue.or_add_budget / 100000).toFixed(1)}L
+                      </div>
+                    )}
+                  </>
+                )}
+              </span>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

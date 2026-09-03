@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import type { Weights, AllocationResult, PersonaKey, Proposal } from '../types';
 import QueryBar from '../components/QueryBar';
@@ -8,24 +9,45 @@ import PortfolioList from '../components/PortfolioList';
 import IndiaMap from '../components/IndiaMap';
 import ConcentrationMeter from '../components/ConcentrationMeter';
 import SectorDonut from '../components/SectorDonut';
+import { submitQuery } from '../api/client';
 
 interface CommandCenterProps {
   weights: Weights;
   onWeightChange: (key: keyof Weights, value: number) => void;
+  budget: number;
   result: AllocationResult;
   activePersona: PersonaKey | null;
   onPersonaSelect: (key: PersonaKey, weights: Weights) => void;
+  onQueryResult: (weights: Weights, allocation: AllocationResult) => void;
   proposals: Proposal[];
 }
 
 export default function CommandCenter({
   weights,
   onWeightChange,
+  budget,
   result,
   activePersona,
   onPersonaSelect,
+  onQueryResult,
   proposals,
 }: CommandCenterProps) {
+  const [queryStatus, setQueryStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+
+  const handleQuery = useCallback(
+    async (text: string) => {
+      setQueryStatus('loading');
+      try {
+        const { parsed_weights, allocation } = await submitQuery(text);
+        onQueryResult(parsed_weights, allocation);
+        setQueryStatus('idle');
+      } catch {
+        setQueryStatus('error');
+      }
+    },
+    [onQueryResult]
+  );
+
   return (
     <>
       {/* Query Bar */}
@@ -34,7 +56,7 @@ export default function CommandCenter({
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       >
-        <QueryBar />
+        <QueryBar onQuery={handleQuery} busy={queryStatus === 'loading'} error={queryStatus === 'error'} />
       </motion.div>
 
       {/* Header */}
@@ -85,7 +107,7 @@ export default function CommandCenter({
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30, delay: 0.15 }}
         >
-          <PortfolioList proposals={proposals} result={result} />
+          <PortfolioList proposals={proposals} result={result} weights={weights} budget={budget} />
         </motion.div>
 
         {/* Right: Map + Meter + Donut */}

@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { Proposal, AllocationResult, Sector } from '../types';
+import { submitSummary } from '../api/client';
 
 interface SummaryPageProps {
   proposals: Proposal[];
@@ -74,13 +75,37 @@ export default function SummaryPage({ proposals, result }: SummaryPageProps) {
     }));
   }, [funded]);
 
-  // Executive summary text
-  const summaryText = useMemo(() => {
+  // Local fallback text — renders instantly, then gets replaced by the real
+  // Groq-written narrative from POST /summary once that arrives.
+  const localSummaryText = useMemo(() => {
     const totalBudget = formatBudget(result.totals.spent);
     const regions = Object.keys(result.coverage);
     const topSector = Object.entries(result.sector_split).sort((a, b) => b[1] - a[1])[0];
     return `The recommended portfolio allocates ${totalBudget} across ${result.totals.count} projects, reaching approximately ${result.totals.beneficiaries.toLocaleString('en-IN')} beneficiaries in ${regions.length} states. ${topSector ? `The highest concentration is in ${topSector[0]} (${topSector[1]} projects), ` : ''}reflecting the organization's strategic priorities. The portfolio achieves a geographic concentration index (HHI) of ${(result.concentration * 100).toFixed(1)}%, indicating ${result.concentration < 0.25 ? 'excellent regional diversity' : result.concentration < 0.4 ? 'moderate spread with room for improvement' : 'concentrated allocation that may benefit from rebalancing'}. Must-fund commitments have been honored, and all projects meet minimum feasibility thresholds.`;
   }, [result]);
+
+  const [narrative, setNarrative] = useState<string | null>(null);
+  const [narrativeStatus, setNarrativeStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+
+  useEffect(() => {
+    let cancelled = false;
+    setNarrativeStatus('loading');
+    submitSummary(result.totals, result.sector_split, result.concentration)
+      .then((res) => {
+        if (!cancelled) {
+          setNarrative(res.summary);
+          setNarrativeStatus('idle');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setNarrativeStatus('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [result]);
+
+  const summaryText = narrative ?? localSummaryText;
 
   const cardStyle = {
     background: 'var(--bg-elevated)',
@@ -130,7 +155,14 @@ export default function SummaryPage({ proposals, result }: SummaryPageProps) {
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         style={cardStyle}
       >
-        <div style={cardHeaderStyle}>Portfolio Summary</div>
+        <div style={{ ...cardHeaderStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>Portfolio Summary</span>
+          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+            {narrativeStatus === 'loading' && 'Writing with AI…'}
+            {narrativeStatus === 'idle' && narrative && '✓ AI-generated'}
+            {narrativeStatus === 'error' && 'Local estimate (AI unavailable)'}
+          </span>
+        </div>
         <div style={{ padding: '20px 24px' }}>
           <p style={{
             fontSize: '0.92rem',
@@ -208,7 +240,7 @@ export default function SummaryPage({ proposals, result }: SummaryPageProps) {
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number) => formatBudget(value)}
+                  formatter={(value) => formatBudget(Number(value))}
                   contentStyle={{
                     background: 'var(--bg-elevated)',
                     border: '1px solid var(--border-subtle)',
@@ -301,7 +333,7 @@ export default function SummaryPage({ proposals, result }: SummaryPageProps) {
                   tickLine={false}
                 />
                 <Tooltip
-                  formatter={(value: number) => formatBudget(value)}
+                  formatter={(value) => formatBudget(Number(value))}
                   contentStyle={{
                     background: 'var(--bg-elevated)',
                     border: '1px solid var(--border-subtle)',

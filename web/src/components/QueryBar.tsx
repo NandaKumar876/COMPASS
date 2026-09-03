@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 
 interface QueryBarProps {
   onQuery?: (text: string) => void;
+  busy?: boolean;
+  error?: boolean;
 }
 
 const EXAMPLES = [
@@ -11,7 +13,7 @@ const EXAMPLES = [
   'Most cost-efficient education portfolio',
 ];
 
-export default function QueryBar({ onQuery }: QueryBarProps) {
+export default function QueryBar({ onQuery, busy, error }: QueryBarProps) {
   const [value, setValue] = useState('');
   const [placeholder, setPlaceholder] = useState('');
   const [exampleIdx, setExampleIdx] = useState(0);
@@ -48,7 +50,7 @@ export default function QueryBar({ onQuery }: QueryBarProps) {
 
   return (
     <div className="query-bar" onClick={() => inputRef.current?.focus()}>
-      <span className="query-icon">⌘</span>
+      <span className="query-icon">{busy ? '◎' : '⌘'}</span>
       <input
         ref={inputRef}
         className="query-input"
@@ -57,8 +59,15 @@ export default function QueryBar({ onQuery }: QueryBarProps) {
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
         placeholder={placeholder || 'Ask anything about allocation...'}
+        disabled={busy}
       />
-      <span className="query-kbd">↵</span>
+      {error ? (
+        <span className="query-kbd" style={{ color: 'var(--accent-terracotta)' }} title="Query failed — try rephrasing">
+          !
+        </span>
+      ) : (
+        <span className="query-kbd">↵</span>
+      )}
     </div>
   );
 }

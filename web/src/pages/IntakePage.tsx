@@ -1,7 +1,20 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { submitIntake } from '../api/client';
 
-// Simulated extraction results
+// Messy, unstructured proposal write-ups sent to the real backend for the
+// "click anywhere to run a demo extraction" path — genuine Groq extraction,
+// not scripted output.
+const DEMO_RAW_TEXTS = [
+  'Women empowerment through handicrafts by Self Employed Women\'s Association in Gujarat. Roughly 18.5 lakh rupees requested to train about 2200 women in traditional handicraft production over a year.',
+  'Mobile veterinary units for pastoralist communities in Rajasthan, run by BAIF Development Research. Asking for 27 lakhs, expected to reach 8000 herders, but the budget breakdown looks thin and timeline is unclear.',
+  'Watershed management program on the Deccan Plateau in Maharashtra by Watershed Organisation Trust. Requesting 41 lakhs to restore water tables for approximately 15000 people over 18 months, strong partner track record.',
+  'Night school for migrant children in Maharashtra run by Pratham Mumbai. 9.8 lakh rupees for about 600 children, 9 month program, well-documented outcomes.',
+  'Sickle cell screening drive in Chhattisgarh via a National Health Mission partner. 15 lakhs requested for 30000 people but the expected outcome is vague and there are no clear metrics.',
+  'Biogas units for dairy farmers in Karnataka by SKG Sangha. 32 lakh rupees for 1200 farmers, budget seems inflated relative to scope.',
+];
+
+// Simulated extraction results — fallback only, used if the backend call fails
 const SIMULATED_EXTRACTIONS = [
   { id: 'EX01', title: 'Women empowerment through handicrafts', partner: 'Self Employed Women\'s Association', sector: 'community', region: 'Gujarat', budget: 1850000, beneficiaries: 2200, confidence: 0.94, redflags: [] },
   { id: 'EX02', title: 'Mobile veterinary units for pastoralists', partner: 'BAIF Development Research', sector: 'community', region: 'Rajasthan', budget: 2700000, beneficiaries: 8000, confidence: 0.88, redflags: ['budget_unrealistic'] },
@@ -56,17 +69,17 @@ export default function IntakePage() {
   const [progress, setProgress] = useState(0);
   const [fileCount, setFileCount] = useState(0);
 
+  // Fallback path — used only if the real backend call fails, so the demo
+  // never hard-breaks on a dead network or missing GROQ_API_KEY.
   const simulateExtraction = useCallback(() => {
     setFileCount(SIMULATED_EXTRACTIONS.length);
     setPhase('uploading');
     setProgress(0);
 
-    // Phase 1: Upload animation (1s)
     setTimeout(() => {
       setPhase('extracting');
       setProgress(0);
 
-      // Phase 2: Extract rows one by one
       SIMULATED_EXTRACTIONS.forEach((ex, i) => {
         setTimeout(() => {
           setRows((prev) => [...prev, { ...ex, revealed: true }]);
@@ -80,22 +93,81 @@ export default function IntakePage() {
     }, 1200);
   }, []);
 
+  // Real extraction — sends files (or canned demo text blurbs) to POST
+  // /intake, which runs actual Groq extraction + red-flag detection, then
+  // reveals the returned rows with the same staggered animation.
+  const runExtraction = useCallback(
+    async (files?: File[], rawTexts?: string[]) => {
+      setRows([]);
+      setPhase('uploading');
+      setProgress(0);
+
+      try {
+        const uploadFiles =
+          files ??
+          (rawTexts ?? []).map(
+            (text, i) => new File([text], `proposal-${i + 1}.txt`, { type: 'text/plain' })
+          );
+        setFileCount(uploadFiles.length);
+
+        // POST /intake only accepts one raw_text field, so multiple demo
+        // blurbs go through as multiple small text files instead.
+        const res = await submitIntake(uploadFiles);
+        const extracted = res.extracted;
+
+        setFileCount(extracted.length);
+        setPhase('extracting');
+
+        extracted.forEach((ex, i) => {
+          setTimeout(() => {
+            setRows((prev) => [
+              ...prev,
+              {
+                id: ex.id,
+                title: ex.title,
+                partner: ex.partner,
+                sector: ex.sector,
+                region: ex.region,
+                budget: ex.budget ?? 0,
+                beneficiaries: ex.beneficiaries ?? 0,
+                confidence: ex.confidence,
+                redflags: ex.redflags.map((r) => r.flag),
+                revealed: true,
+              },
+            ]);
+            setProgress(((i + 1) / extracted.length) * 100);
+
+            if (i === extracted.length - 1) {
+              setTimeout(() => setPhase('done'), 400);
+            }
+          }, 300 + i * 300);
+        });
+      } catch {
+        simulateExtraction();
+      }
+    },
+    [simulateExtraction]
+  );
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       setDragOver(false);
       if (phase !== 'idle') return;
-      setRows([]);
-      simulateExtraction();
+      const dropped = Array.from(e.dataTransfer.files);
+      if (dropped.length > 0) {
+        runExtraction(dropped);
+      } else {
+        runExtraction(undefined, DEMO_RAW_TEXTS);
+      }
     },
-    [phase, simulateExtraction]
+    [phase, runExtraction]
   );
 
   const handleClick = useCallback(() => {
     if (phase !== 'idle') return;
-    setRows([]);
-    simulateExtraction();
-  }, [phase, simulateExtraction]);
+    runExtraction(undefined, DEMO_RAW_TEXTS);
+  }, [phase, runExtraction]);
 
   const handleReset = useCallback(() => {
     setPhase('idle');
@@ -290,7 +362,7 @@ export default function IntakePage() {
               </thead>
               <tbody>
                 <AnimatePresence>
-                  {rows.map((row, i) => (
+                  {rows.map((row) => (
                     <motion.tr
                       key={row.id}
                       initial={{ opacity: 0, x: -20, backgroundColor: 'rgba(106, 155, 110, 0.08)' }}

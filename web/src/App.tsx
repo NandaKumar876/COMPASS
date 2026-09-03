@@ -20,6 +20,7 @@ export default function App() {
     result,
     activePersona,
     applyPersona,
+    applyQueryResult,
     proposals,
   } = useAllocation();
 
@@ -45,9 +46,11 @@ export default function App() {
               <CommandCenter
                 weights={weights}
                 onWeightChange={setWeights}
+                budget={budget}
                 result={result}
                 activePersona={activePersona}
                 onPersonaSelect={applyPersona}
+                onQueryResult={applyQueryResult}
                 proposals={proposals}
               />
             </motion.div>

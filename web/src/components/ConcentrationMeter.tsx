@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface ConcentrationMeterProps {
   concentration: number; // 0 (well spread) to 1 (concentrated)
@@ -34,21 +34,25 @@ export default function ConcentrationMeter({ concentration }: ConcentrationMeter
           }}
         />
       </div>
-      <motion.div
-        className="meter-value"
-        key={label}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        style={{
-          color: isGood
-            ? 'var(--accent-sage)'
-            : isBad
-            ? 'var(--accent-terracotta)'
-            : 'var(--accent-amber)',
-        }}
-      >
-        {label} — {(concentration * 100).toFixed(0)}% HHI
-      </motion.div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          className="meter-value"
+          key={label}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          style={{
+            color: isGood
+              ? 'var(--accent-sage)'
+              : isBad
+              ? 'var(--accent-terracotta)'
+              : 'var(--accent-amber)',
+          }}
+        >
+          {label} — {(concentration * 100).toFixed(0)}% HHI
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
