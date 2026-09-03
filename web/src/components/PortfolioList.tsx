@@ -1,14 +1,21 @@
 import { AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useState, useMemo } from 'react';
-import type { Proposal, AllocationResult } from '../types';
+import type { Proposal, AllocationResult, Weights } from '../types';
 import ProjectCard from './ProjectCard';
 
 interface PortfolioListProps {
   proposals: Proposal[];
   result: AllocationResult;
+  weights?: Weights;
+  budget?: number;
 }
 
-export default function PortfolioList({ proposals, result }: PortfolioListProps) {
+export default function PortfolioList({
+  proposals,
+  result,
+  weights,
+  budget,
+}: PortfolioListProps) {
   const [showFunded, setShowFunded] = useState(true);
 
   const fundedSet = useMemo(() => new Set(result.funded), [result.funded]);
@@ -52,6 +59,9 @@ export default function PortfolioList({ proposals, result }: PortfolioListProps)
                   proposal={p}
                   score={result.per_project_score[p.id] ?? 0}
                   index={i}
+                  weights={weights}
+                  budget={budget}
+                  result={result}
                 />
               ))}
             </AnimatePresence>

@@ -15,12 +15,14 @@ export default function App() {
   const {
     weights,
     setWeights,
+    setFullWeights,
     budget,
     setBudget,
     result,
     activePersona,
     applyPersona,
     proposals,
+    isBackendConnected,
   } = useAllocation();
 
   return (
@@ -45,10 +47,13 @@ export default function App() {
               <CommandCenter
                 weights={weights}
                 onWeightChange={setWeights}
+                setFullWeights={setFullWeights}
+                budget={budget}
                 result={result}
                 activePersona={activePersona}
                 onPersonaSelect={applyPersona}
                 proposals={proposals}
+                isBackendConnected={isBackendConnected}
               />
             </motion.div>
           )}

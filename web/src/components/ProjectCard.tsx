@@ -1,11 +1,15 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
-import type { Proposal, Sector } from '../types';
+import { useState, useEffect } from 'react';
+import type { Proposal, Sector, Weights, AllocationResult, ExplainResult } from '../types';
+import { api } from '../api/client';
 
 interface ProjectCardProps {
   proposal: Proposal;
   score: number;
   index: number;
+  weights?: Weights;
+  budget?: number;
+  result?: AllocationResult;
 }
 
 const SECTOR_COLORS: Record<Sector, string> = {
@@ -28,10 +32,34 @@ function formatBudget(n: number): string {
   return `₹${n.toLocaleString('en-IN')}`;
 }
 
-export default function ProjectCard({ proposal, score, index }: ProjectCardProps) {
+export default function ProjectCard({
+  proposal,
+  score,
+  index,
+  weights,
+  budget,
+  result,
+}: ProjectCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [explanation, setExplanation] = useState<ExplainResult | null>(null);
+  const [loadingExplain, setLoadingExplain] = useState(false);
+
   const color = SECTOR_COLORS[proposal.sector];
   const bg = SECTOR_BG[proposal.sector];
+
+  useEffect(() => {
+    if (expanded && weights && budget && result) {
+      setLoadingExplain(true);
+      api
+        .explain(proposal.id, weights, budget, {
+          funded: result.funded,
+          spent: result.totals.spent,
+        })
+        .then((res) => setExplanation(res))
+        .catch(() => setExplanation(null))
+        .finally(() => setLoadingExplain(false));
+    }
+  }, [expanded, proposal.id, weights, budget, result]);
 
   return (
     <motion.div
@@ -86,6 +114,59 @@ export default function ProjectCard({ proposal, score, index }: ProjectCardProps
             }}
           >
             <p className="project-outcome">"{proposal.expected_outcome}"</p>
+
+            {/* AI Explanation and Counterfactual Rescue Banner */}
+            {explanation && explanation.reason && (
+              <div
+                style={{
+                  background: 'var(--bg-sunken)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  ⚡ Decision Explanation
+                </span>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                  {explanation.reason}
+                </p>
+                {explanation.rescue && (
+                  <div
+                    style={{
+                      marginTop: 4,
+                      padding: '6px 8px',
+                      background: 'var(--accent-amber-light)',
+                      borderRadius: 6,
+                      fontSize: '0.74rem',
+                      fontWeight: 600,
+                      color: 'var(--accent-amber)',
+                    }}
+                  >
+                    🛠️ <strong>Rescue:</strong> Drop {explanation.rescue.drop.join(', ')} or add{' '}
+                    {formatBudget(explanation.rescue.or_add_budget)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {loadingExplain && (
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                Loading AI explanation…
+              </span>
+            )}
+
             <div className="project-expanded-row">
               <span className="project-expanded-label">Sector</span>
               <span

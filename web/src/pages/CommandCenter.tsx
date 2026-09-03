@@ -8,24 +8,42 @@ import PortfolioList from '../components/PortfolioList';
 import IndiaMap from '../components/IndiaMap';
 import ConcentrationMeter from '../components/ConcentrationMeter';
 import SectorDonut from '../components/SectorDonut';
+import { api } from '../api/client';
 
 interface CommandCenterProps {
   weights: Weights;
   onWeightChange: (key: keyof Weights, value: number) => void;
+  setFullWeights?: (weights: Weights) => void;
+  budget: number;
   result: AllocationResult;
   activePersona: PersonaKey | null;
   onPersonaSelect: (key: PersonaKey, weights: Weights) => void;
   proposals: Proposal[];
+  isBackendConnected?: boolean;
 }
 
 export default function CommandCenter({
   weights,
   onWeightChange,
+  setFullWeights,
+  budget,
   result,
   activePersona,
   onPersonaSelect,
   proposals,
+  isBackendConnected,
 }: CommandCenterProps) {
+  const handleQuery = async (text: string) => {
+    try {
+      const res = await api.query(text);
+      if (res.parsed_weights && setFullWeights) {
+        setFullWeights(res.parsed_weights);
+      }
+    } catch {
+      // Ignore if query fails
+    }
+  };
+
   return (
     <>
       {/* Query Bar */}
@@ -34,13 +52,31 @@ export default function CommandCenter({
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       >
-        <QueryBar />
+        <QueryBar onQuery={handleQuery} />
       </motion.div>
 
       {/* Header */}
       <div className="header-bar">
         <div className="header-title">
-          <h2>Command Centre</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h2>Command Centre</h2>
+            {isBackendConnected && (
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  color: 'var(--accent-sage)',
+                  background: 'var(--accent-sage-light)',
+                  padding: '2px 8px',
+                  borderRadius: 9999,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                ● Live API Connected
+              </span>
+            )}
+          </div>
           <p>Steer your portfolio in real time — every slider move re-optimises instantly</p>
         </div>
       </div>
@@ -85,7 +121,12 @@ export default function CommandCenter({
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30, delay: 0.15 }}
         >
-          <PortfolioList proposals={proposals} result={result} />
+          <PortfolioList
+            proposals={proposals}
+            result={result}
+            weights={weights}
+            budget={budget}
+          />
         </motion.div>
 
         {/* Right: Map + Meter + Donut */}
