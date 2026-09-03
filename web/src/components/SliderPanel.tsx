@@ -78,7 +78,7 @@ export default function SliderPanel({ weights, onWeightChange }: SliderPanelProp
                 step={0.01}
                 value={value}
                 onChange={(e) => onWeightChange(s.key, parseFloat(e.target.value))}
-                style={{ position: 'relative', zIndex: 2, color: s.color }}
+                style={{ color: s.color }}
               />
             </div>
           </motion.div>

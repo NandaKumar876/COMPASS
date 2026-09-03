@@ -15,12 +15,12 @@ export default function App() {
   const {
     weights,
     setWeights,
-    setFullWeights,
     budget,
     setBudget,
     result,
     activePersona,
     applyPersona,
+    applyQueryResult,
     proposals,
     isBackendConnected,
   } = useAllocation();
@@ -47,11 +47,11 @@ export default function App() {
               <CommandCenter
                 weights={weights}
                 onWeightChange={setWeights}
-                setFullWeights={setFullWeights}
                 budget={budget}
                 result={result}
                 activePersona={activePersona}
                 onPersonaSelect={applyPersona}
+                onQueryResult={applyQueryResult}
                 proposals={proposals}
                 isBackendConnected={isBackendConnected}
               />

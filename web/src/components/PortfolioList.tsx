@@ -6,16 +6,11 @@ import ProjectCard from './ProjectCard';
 interface PortfolioListProps {
   proposals: Proposal[];
   result: AllocationResult;
-  weights?: Weights;
-  budget?: number;
+  weights: Weights;
+  budget: number;
 }
 
-export default function PortfolioList({
-  proposals,
-  result,
-  weights,
-  budget,
-}: PortfolioListProps) {
+export default function PortfolioList({ proposals, result, weights, budget }: PortfolioListProps) {
   const [showFunded, setShowFunded] = useState(true);
 
   const fundedSet = useMemo(() => new Set(result.funded), [result.funded]);
@@ -61,7 +56,7 @@ export default function PortfolioList({
                   index={i}
                   weights={weights}
                   budget={budget}
-                  result={result}
+                  allocationState={{ funded: result.funded, spent: result.totals.spent }}
                 />
               ))}
             </AnimatePresence>

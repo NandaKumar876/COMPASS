@@ -1,96 +1,79 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Weights, AllocationResult, PersonaKey, Proposal } from '../types';
-import { proposals as seedProposals } from '../data/proposals';
+import { proposals as localProposals } from '../data/proposals';
 import { DEFAULT_WEIGHTS, DEFAULT_BUDGET } from '../data/objectives';
-import { allocate as clientSolver } from '../engine/solver';
-import { api } from '../api/client';
+import { allocate } from '../engine/solver';
+import { getProposals } from '../api/client';
 
 export function useAllocation() {
-  const [proposals, setProposals] = useState<Proposal[]>(seedProposals);
-  const [weights, setWeights] = useState<Weights>({ ...DEFAULT_WEIGHTS });
-  const [budget, setBudget] = useState(DEFAULT_BUDGET);
+  const [proposals, setProposals] = useState<Proposal[]>(localProposals);
+  const [weights, setWeightsState] = useState<Weights>({ ...DEFAULT_WEIGHTS });
+  const [budget, setBudgetState] = useState(DEFAULT_BUDGET);
   const [activePersona, setActivePersona] = useState<PersonaKey | null>(null);
-  const [serverResult, setServerResult] = useState<AllocationResult | null>(null);
-  const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const [queryResult, setQueryResult] = useState<AllocationResult | null>(null);
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
 
-  // Load proposals from FastAPI on mount
+  // Load the canonical proposal set from the backend once on mount.
+  // Falls back to the bundled local data if the backend is unreachable,
+  // so the demo never hard-fails on a dead network.
   useEffect(() => {
-    let isMounted = true;
-    api
-      .getProposals()
-      .then((data) => {
-        if (isMounted && data && data.length > 0) {
-          setProposals(data);
+    let cancelled = false;
+    getProposals()
+      .then((fetched) => {
+        if (!cancelled && fetched.length > 0) {
+          setProposals(fetched);
           setIsBackendConnected(true);
         }
       })
       .catch(() => {
-        // Fallback silently to client seed proposals
-        if (isMounted) setIsBackendConnected(false);
+        // stay on localProposals, isBackendConnected stays false
       });
     return () => {
-      isMounted = false;
+      cancelled = true;
     };
   }, []);
 
-  // Compute immediate client result for 0ms slider latency
   const localResult: AllocationResult = useMemo(
-    () => clientSolver(proposals, weights, budget),
+    () => allocate(proposals, weights, budget),
     [proposals, weights, budget]
   );
 
-  // Debounced live sync to FastAPI backend /allocate endpoint
-  useEffect(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    const timeout = setTimeout(() => {
-      api
-        .allocate(weights, budget)
-        .then((res) => {
-          if (!controller.signal.aborted) {
-            setServerResult(res);
-            setIsBackendConnected(true);
-          }
-        })
-        .catch(() => {
-          if (!controller.signal.aborted) {
-            setIsBackendConnected(false);
-          }
-        });
-    }, 80);
-
-    return () => {
-      clearTimeout(timeout);
-      controller.abort();
-    };
-  }, [weights, budget]);
+  // A backend-driven query result (from POST /query) overrides the instant
+  // local re-solve until the user moves a slider or picks a persona again.
+  const result = queryResult ?? localResult;
 
   const applyPersona = useCallback((key: PersonaKey, personaWeights: Weights) => {
     setActivePersona(key);
-    setWeights({ ...personaWeights });
+    setQueryResult(null);
+    setWeightsState({ ...personaWeights });
   }, []);
 
   const updateWeight = useCallback((key: keyof Weights, value: number) => {
     setActivePersona(null);
-    setWeights((prev) => ({ ...prev, [key]: value }));
+    setQueryResult(null);
+    setWeightsState((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const result = serverResult || localResult;
+  const setBudget = useCallback((value: number) => {
+    setQueryResult(null);
+    setBudgetState(value);
+  }, []);
+
+  const applyQueryResult = useCallback((newWeights: Weights, allocation: AllocationResult) => {
+    setActivePersona(null);
+    setWeightsState(newWeights);
+    setQueryResult(allocation);
+  }, []);
 
   return {
     weights,
     setWeights: updateWeight,
-    setFullWeights: setWeights,
     budget,
     setBudget,
     result,
     activePersona,
     applyPersona,
+    applyQueryResult,
     proposals,
     isBackendConnected,
   };

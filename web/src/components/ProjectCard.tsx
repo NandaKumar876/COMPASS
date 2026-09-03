@@ -1,15 +1,15 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
-import type { Proposal, Sector, Weights, AllocationResult, ExplainResult } from '../types';
-import { api } from '../api/client';
+import type { Proposal, Sector, Weights, ExplainResponse } from '../types';
+import { explainProject } from '../api/client';
 
 interface ProjectCardProps {
   proposal: Proposal;
   score: number;
   index: number;
-  weights?: Weights;
-  budget?: number;
-  result?: AllocationResult;
+  weights: Weights;
+  budget: number;
+  allocationState: { funded: string[]; spent: number };
 }
 
 const SECTOR_COLORS: Record<Sector, string> = {
@@ -32,34 +32,33 @@ function formatBudget(n: number): string {
   return `₹${n.toLocaleString('en-IN')}`;
 }
 
+type ExplainStatus = 'idle' | 'loading' | 'error';
+
 export default function ProjectCard({
   proposal,
   score,
   index,
   weights,
   budget,
-  result,
+  allocationState,
 }: ProjectCardProps) {
   const [expanded, setExpanded] = useState(false);
-  const [explanation, setExplanation] = useState<ExplainResult | null>(null);
-  const [loadingExplain, setLoadingExplain] = useState(false);
-
+  const [explainStatus, setExplainStatus] = useState<ExplainStatus>('idle');
+  const [explanation, setExplanation] = useState<ExplainResponse | null>(null);
   const color = SECTOR_COLORS[proposal.sector];
   const bg = SECTOR_BG[proposal.sector];
 
   useEffect(() => {
-    if (expanded && weights && budget && result) {
-      setLoadingExplain(true);
-      api
-        .explain(proposal.id, weights, budget, {
-          funded: result.funded,
-          spent: result.totals.spent,
-        })
-        .then((res) => setExplanation(res))
-        .catch(() => setExplanation(null))
-        .finally(() => setLoadingExplain(false));
-    }
-  }, [expanded, proposal.id, weights, budget, result]);
+    if (!expanded || explanation || explainStatus === 'loading') return;
+    setExplainStatus('loading');
+    explainProject(proposal.id, weights, budget, allocationState)
+      .then((res) => {
+        setExplanation(res);
+        setExplainStatus('idle');
+      })
+      .catch(() => setExplainStatus('error'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded]);
 
   return (
     <motion.div
@@ -68,10 +67,10 @@ export default function ProjectCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95, y: -8 }}
       transition={{
-        type: 'spring',
-        stiffness: 500,
-        damping: 35,
-        delay: index * 0.02,
+        opacity: { duration: 0.22, ease: [0.22, 1, 0.36, 1], delay: index * 0.02 },
+        scale: { type: 'spring', stiffness: 500, damping: 35, delay: index * 0.02 },
+        y: { type: 'spring', stiffness: 500, damping: 35, delay: index * 0.02 },
+        layout: { type: 'spring', stiffness: 320, damping: 32 },
       }}
       style={{ borderRadius: 12, overflow: 'hidden' }}
     >
@@ -115,58 +114,6 @@ export default function ProjectCard({
           >
             <p className="project-outcome">"{proposal.expected_outcome}"</p>
 
-            {/* AI Explanation and Counterfactual Rescue Banner */}
-            {explanation && explanation.reason && (
-              <div
-                style={{
-                  background: 'var(--bg-sunken)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 8,
-                  padding: '10px 12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 6,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  ⚡ Decision Explanation
-                </span>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                  {explanation.reason}
-                </p>
-                {explanation.rescue && (
-                  <div
-                    style={{
-                      marginTop: 4,
-                      padding: '6px 8px',
-                      background: 'var(--accent-amber-light)',
-                      borderRadius: 6,
-                      fontSize: '0.74rem',
-                      fontWeight: 600,
-                      color: 'var(--accent-amber)',
-                    }}
-                  >
-                    🛠️ <strong>Rescue:</strong> Drop {explanation.rescue.drop.join(', ')} or add{' '}
-                    {formatBudget(explanation.rescue.or_add_budget)}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {loadingExplain && (
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                Loading AI explanation…
-              </span>
-            )}
-
             <div className="project-expanded-row">
               <span className="project-expanded-label">Sector</span>
               <span
@@ -209,6 +156,25 @@ export default function ProjectCard({
                 ✦ Must-Fund Commitment
               </div>
             )}
+
+            <div className="project-expanded-row" style={{ alignItems: 'flex-start', marginTop: 4 }}>
+              <span className="project-expanded-label">Why</span>
+              <span className="project-expanded-value">
+                {explainStatus === 'loading' && 'Asking the AI layer…'}
+                {explainStatus === 'error' && 'Could not reach the explanation service.'}
+                {explainStatus === 'idle' && explanation && (
+                  <>
+                    {explanation.reason}
+                    {explanation.rescue && (
+                      <div style={{ marginTop: 6, fontWeight: 600, color: 'var(--accent-amber)' }}>
+                        Rescue: drop {explanation.rescue.drop.join(' + ')} or add{' '}
+                        ₹{(explanation.rescue.or_add_budget / 100000).toFixed(1)}L
+                      </div>
+                    )}
+                  </>
+                )}
+              </span>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

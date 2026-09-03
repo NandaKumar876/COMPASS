@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import type { Weights, AllocationResult, PersonaKey, Proposal } from '../types';
 import QueryBar from '../components/QueryBar';
@@ -8,16 +9,16 @@ import PortfolioList from '../components/PortfolioList';
 import IndiaMap from '../components/IndiaMap';
 import ConcentrationMeter from '../components/ConcentrationMeter';
 import SectorDonut from '../components/SectorDonut';
-import { api } from '../api/client';
+import { submitQuery } from '../api/client';
 
 interface CommandCenterProps {
   weights: Weights;
   onWeightChange: (key: keyof Weights, value: number) => void;
-  setFullWeights?: (weights: Weights) => void;
   budget: number;
   result: AllocationResult;
   activePersona: PersonaKey | null;
   onPersonaSelect: (key: PersonaKey, weights: Weights) => void;
+  onQueryResult: (weights: Weights, allocation: AllocationResult) => void;
   proposals: Proposal[];
   isBackendConnected?: boolean;
 }
@@ -25,24 +26,29 @@ interface CommandCenterProps {
 export default function CommandCenter({
   weights,
   onWeightChange,
-  setFullWeights,
   budget,
   result,
   activePersona,
   onPersonaSelect,
+  onQueryResult,
   proposals,
   isBackendConnected,
 }: CommandCenterProps) {
-  const handleQuery = async (text: string) => {
-    try {
-      const res = await api.query(text);
-      if (res.parsed_weights && setFullWeights) {
-        setFullWeights(res.parsed_weights);
+  const [queryStatus, setQueryStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+
+  const handleQuery = useCallback(
+    async (text: string) => {
+      setQueryStatus('loading');
+      try {
+        const { parsed_weights, allocation } = await submitQuery(text);
+        onQueryResult(parsed_weights, allocation);
+        setQueryStatus('idle');
+      } catch {
+        setQueryStatus('error');
       }
-    } catch {
-      // Ignore if query fails
-    }
-  };
+    },
+    [onQueryResult]
+  );
 
   return (
     <>
@@ -52,7 +58,7 @@ export default function CommandCenter({
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       >
-        <QueryBar onQuery={handleQuery} />
+        <QueryBar onQuery={handleQuery} busy={queryStatus === 'loading'} error={queryStatus === 'error'} />
       </motion.div>
 
       {/* Header */}
@@ -121,12 +127,7 @@ export default function CommandCenter({
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30, delay: 0.15 }}
         >
-          <PortfolioList
-            proposals={proposals}
-            result={result}
-            weights={weights}
-            budget={budget}
-          />
+          <PortfolioList proposals={proposals} result={result} weights={weights} budget={budget} />
         </motion.div>
 
         {/* Right: Map + Meter + Donut */}
