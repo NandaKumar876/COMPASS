@@ -61,9 +61,12 @@ export function useAllocation() {
     setQueryResult(allocation);
   }, []);
 
+  const result = serverResult || localResult;
+
   return {
     weights,
     setWeights: updateWeight,
+    setFullWeights: setWeights,
     budget,
     setBudget,
     result,
@@ -71,5 +74,6 @@ export function useAllocation() {
     applyPersona,
     applyQueryResult,
     proposals,
+    isBackendConnected,
   };
 }

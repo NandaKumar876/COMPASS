@@ -20,6 +20,7 @@ interface CommandCenterProps {
   onPersonaSelect: (key: PersonaKey, weights: Weights) => void;
   onQueryResult: (weights: Weights, allocation: AllocationResult) => void;
   proposals: Proposal[];
+  isBackendConnected?: boolean;
 }
 
 export default function CommandCenter({
@@ -31,6 +32,7 @@ export default function CommandCenter({
   onPersonaSelect,
   onQueryResult,
   proposals,
+  isBackendConnected,
 }: CommandCenterProps) {
   const [queryStatus, setQueryStatus] = useState<'idle' | 'loading' | 'error'>('idle');
 
@@ -62,7 +64,25 @@ export default function CommandCenter({
       {/* Header */}
       <div className="header-bar">
         <div className="header-title">
-          <h2>Command Centre</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h2>Command Centre</h2>
+            {isBackendConnected && (
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  color: 'var(--accent-sage)',
+                  background: 'var(--accent-sage-light)',
+                  padding: '2px 8px',
+                  borderRadius: 9999,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                ● Live API Connected
+              </span>
+            )}
+          </div>
           <p>Steer your portfolio in real time — every slider move re-optimises instantly</p>
         </div>
       </div>

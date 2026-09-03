@@ -15,6 +15,7 @@ export default function App() {
   const {
     weights,
     setWeights,
+    setFullWeights,
     budget,
     setBudget,
     result,
@@ -22,6 +23,7 @@ export default function App() {
     applyPersona,
     applyQueryResult,
     proposals,
+    isBackendConnected,
   } = useAllocation();
 
   return (
@@ -52,6 +54,7 @@ export default function App() {
                 onPersonaSelect={applyPersona}
                 onQueryResult={applyQueryResult}
                 proposals={proposals}
+                isBackendConnected={isBackendConnected}
               />
             </motion.div>
           )}
