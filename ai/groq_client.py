@@ -14,7 +14,7 @@ def get_client() -> Groq:
 
 
 def call_groq(
-    system_prompt: str, user_message: str, model: str = "llama3-70b-8192", json_mode: bool = True
+    system_prompt: str, user_message: str, model: str = "openai/gpt-oss-120b", json_mode: bool = True
 ) -> str:
     client = get_client()
     kwargs = {

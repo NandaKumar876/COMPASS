@@ -9,4 +9,4 @@ def generate_summary(allocation_summary: dict) -> str:
         "Write a concise board-ready paragraph summarizing this funded portfolio, "
         "the total reach, geographic spread, and how it aligns with organizational objectives."
     )
-    return call_groq(PROMPTS["summary_system"], user, model="llama3-70b-8192", json_mode=False)
+    return call_groq(PROMPTS["summary_system"], user, model="openai/gpt-oss-120b", json_mode=False)

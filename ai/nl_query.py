@@ -3,7 +3,7 @@ from ai.prompts import PROMPTS
 
 
 def parse_nl_query(text: str) -> dict:
-    result = call_groq(PROMPTS["nl_query_system"], text, model="llama3-8b-8192")
+    result = call_groq(PROMPTS["nl_query_system"], text, model="openai/gpt-oss-20b")
     parsed = safe_json_parse(result)
     total = sum(parsed["weights"].values())
     if total > 0:

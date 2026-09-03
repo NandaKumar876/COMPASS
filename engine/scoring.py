@@ -25,6 +25,8 @@ def compute_raw_scores(
 
 
 def normalize(raw_scores: dict[str, dict[str, float]]) -> dict[str, dict[str, float]]:
+    if not raw_scores:
+        return {}
     mins = {d: min(v[d] for v in raw_scores.values()) for d in DIMENSIONS}
     maxs = {d: max(v[d] for v in raw_scores.values()) for d in DIMENSIONS}
     normed = {}

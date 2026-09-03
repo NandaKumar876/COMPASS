@@ -41,3 +41,12 @@ def test_score_proposals_end_to_end(sample_proposals, sample_regions, sample_foc
     assert set(scores.keys()) == {"P001", "P002", "P003"}
     for v in scores.values():
         assert 0.0 <= v <= 1.0
+
+
+def test_normalize_empty_input_returns_empty_dict():
+    assert normalize({}) == {}
+
+
+def test_score_proposals_empty_list_returns_empty_dict(sample_regions, sample_focus_areas, sample_weights):
+    scores = score_proposals([], sample_regions, sample_focus_areas, sample_weights)
+    assert scores == {}

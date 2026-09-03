@@ -38,4 +38,4 @@ def build_facts(
 def explain_decision(facts: dict) -> str:
     system = PROMPTS["explain_system"]
     user = PROMPTS["explain_user"].format(facts=json.dumps(facts))
-    return call_groq(system, user, model="llama3-70b-8192", json_mode=False)
+    return call_groq(system, user, model="openai/gpt-oss-120b", json_mode=False)

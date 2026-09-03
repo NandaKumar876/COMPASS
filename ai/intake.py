@@ -9,7 +9,7 @@ REQUIRED_FIELDS = [
 
 
 def extract_proposal(raw_text: str, proposal_id: str) -> dict:
-    result = call_groq(PROMPTS["intake_system"], raw_text, model="llama3-70b-8192")
+    result = call_groq(PROMPTS["intake_system"], raw_text, model="openai/gpt-oss-120b")
     data = safe_json_parse(result)
     data["id"] = proposal_id
     data.setdefault("must_fund", False)
