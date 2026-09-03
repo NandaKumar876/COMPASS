@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#6A9B6E"/>
+  <g transform="translate(16,16)">
+    <!-- Compass rose outer -->
+    <path d="M0,-12 L3,-3 L12,0 L3,3 L0,12 L-3,3 L-12,0 L-3,-3 Z" fill="rgba(255,255,255,0.25)" stroke="none"/>
+    <!-- Needle north (white) -->
+    <path d="M0,-10 L2.5,0 L-2.5,0 Z" fill="#FFFFFF"/>
+    <!-- Needle south (amber) -->
+    <path d="M0,10 L2.5,0 L-2.5,0 Z" fill="#D4973B"/>
+    <!-- Center dot -->
+    <circle cx="0" cy="0" r="1.5" fill="#FFFFFF"/>
+  </g>
+</svg>
