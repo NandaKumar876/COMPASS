@@ -1,0 +1,17 @@
+[
+  { "name": "Odisha", "saturation": 0.20, "need_index": 0.85, "population": 46000000 },
+  { "name": "Bihar", "saturation": 0.15, "need_index": 0.90, "population": 124000000 },
+  { "name": "Uttar Pradesh", "saturation": 0.25, "need_index": 0.88, "population": 231000000 },
+  { "name": "Rajasthan", "saturation": 0.30, "need_index": 0.75, "population": 81000000 },
+  { "name": "Madhya Pradesh", "saturation": 0.22, "need_index": 0.80, "population": 85000000 },
+  { "name": "Chhattisgarh", "saturation": 0.18, "need_index": 0.82, "population": 29000000 },
+  { "name": "Jharkhand", "saturation": 0.17, "need_index": 0.84, "population": 38000000 },
+  { "name": "West Bengal", "saturation": 0.35, "need_index": 0.65, "population": 99000000 },
+  { "name": "Tamil Nadu", "saturation": 0.60, "need_index": 0.40, "population": 77000000 },
+  { "name": "Karnataka", "saturation": 0.55, "need_index": 0.45, "population": 68000000 },
+  { "name": "Maharashtra", "saturation": 0.70, "need_index": 0.35, "population": 123000000 },
+  { "name": "Gujarat", "saturation": 0.65, "need_index": 0.38, "population": 71000000 },
+  { "name": "Assam", "saturation": 0.25, "need_index": 0.78, "population": 35000000 },
+  { "name": "Kerala", "saturation": 0.58, "need_index": 0.30, "population": 35000000 },
+  { "name": "Punjab", "saturation": 0.45, "need_index": 0.50, "population": 30000000 }
+]
