@@ -23,6 +23,7 @@ export default function App() {
     applyQueryResult,
     proposals,
     isBackendConnected,
+    refreshProposals,
   } = useAllocation();
 
   return (
@@ -67,7 +68,7 @@ export default function App() {
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
               style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
             >
-              <IntakePage />
+              <IntakePage onIntakeComplete={refreshProposals} />
             </motion.div>
           )}
 

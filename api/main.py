@@ -1,8 +1,13 @@
+import asyncio
+import io
+from typing import get_args
+
 from fastapi import FastAPI, UploadFile, File, Form
+from pypdf import PdfReader
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from engine.models import Weights, Constraints
+from engine.models import Weights, Constraints, Proposal, Sector
 from engine.scoring import score_proposals
 from engine.solver import allocate_greedy, compute_totals
 from engine.constraints import filter_proposals
@@ -13,7 +18,7 @@ from ai.intake import extract_proposal
 from ai.redflags import check_redflags
 from ai.summary import generate_summary
 
-from api.data_loader import load_proposals, load_regions, load_objectives
+from api.data_loader import load_proposals, load_regions, load_objectives, add_proposal, next_extracted_id
 from api.schemas import AllocateRequest, ExplainRequest, QueryRequest, SummaryRequest
 
 load_dotenv()
@@ -98,6 +103,52 @@ def query(req: QueryRequest):
     }
 
 
+def _extract_text(filename: str, content: bytes) -> str:
+    if filename.lower().endswith(".pdf"):
+        reader = PdfReader(io.BytesIO(content))
+        return "\n".join(page.extract_text() or "" for page in reader.pages)
+    return content.decode("utf-8", errors="ignore")
+
+
+KNOWN_SECTORS = set(get_args(Sector))
+
+
+def _extracted_to_proposal(data: dict, regions: dict) -> Proposal | None:
+    """Turn a loosely-typed Groq extraction into a valid, scorable Proposal,
+    filling safe defaults for anything missing/unrecognized so a messy
+    document can't crash the optimizer or corrupt the region/sector keys it
+    depends on."""
+    region_raw = (data.get("region") or "").strip()
+    region = next((r for r in regions if r.lower() == region_raw.lower()), None)
+    if region is None:
+        region = next((r for r in regions if region_raw and region_raw.lower() in r.lower()), None)
+    if region is None:
+        region = sorted(regions.keys())[0]
+
+    sector = data.get("sector") if data.get("sector") in KNOWN_SECTORS else "community"
+
+    try:
+        return Proposal(
+            id=data["id"],
+            title=data.get("title") or f"Untitled proposal ({data['id']})",
+            partner=data.get("partner") or "Unknown partner",
+            sector=sector,
+            region=region,
+            budget=data.get("budget") or 1_000_000.0,
+            beneficiaries=data.get("beneficiaries") or 100,
+            outcome_depth=data.get("outcome_depth") if data.get("outcome_depth") is not None else 0.5,
+            expected_outcome=data.get("expected_outcome") or "Not specified",
+            timeline_months=data.get("timeline_months"),
+            partner_track_record=(
+                data.get("partner_track_record") if data.get("partner_track_record") is not None else 0.5
+            ),
+            budget_realism=data.get("budget_realism") if data.get("budget_realism") is not None else 0.5,
+            must_fund=False,
+        )
+    except Exception:
+        return None
+
+
 @app.post("/intake")
 async def intake(
     files: list[UploadFile] | None = File(default=None),
@@ -107,16 +158,27 @@ async def intake(
     if files:
         for f in files:
             content = await f.read()
-            texts.append(content.decode("utf-8", errors="ignore"))
+            texts.append(_extract_text(f.filename or "", content))
     elif raw_text:
         texts.append(raw_text)
 
-    extracted = []
-    for i, text in enumerate(texts, start=1):
-        data = extract_proposal(text, f"EX{i:03d}")
+    def process_one(proposal_id: str, text: str) -> dict:
+        data = extract_proposal(text, proposal_id)
         data["redflags"] = check_redflags(data)
-        extracted.append(data)
-    return {"extracted": extracted}
+        return data
+
+    ids = [next_extracted_id() for _ in texts]
+    extracted = await asyncio.gather(
+        *(asyncio.to_thread(process_one, pid, text) for pid, text in zip(ids, texts))
+    )
+
+    regions = load_regions()
+    for data in extracted:
+        proposal = _extracted_to_proposal(data, regions)
+        if proposal is not None:
+            add_proposal(proposal)
+
+    return {"extracted": list(extracted)}
 
 
 @app.post("/summary")

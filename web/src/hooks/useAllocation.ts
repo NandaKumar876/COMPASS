@@ -16,22 +16,22 @@ export function useAllocation() {
   // Load the canonical proposal set from the backend once on mount.
   // Falls back to the bundled local data if the backend is unreachable,
   // so the demo never hard-fails on a dead network.
-  useEffect(() => {
-    let cancelled = false;
-    getProposals()
+  const refreshProposals = useCallback(() => {
+    return getProposals()
       .then((fetched) => {
-        if (!cancelled && fetched.length > 0) {
+        if (fetched.length > 0) {
           setProposals(fetched);
           setIsBackendConnected(true);
         }
       })
       .catch(() => {
-        // stay on localProposals, isBackendConnected stays false
+        // stay on current proposals, isBackendConnected stays false
       });
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    refreshProposals();
+  }, [refreshProposals]);
 
   const localResult: AllocationResult = useMemo(
     () => allocate(proposals, weights, budget),
@@ -76,5 +76,6 @@ export function useAllocation() {
     applyQueryResult,
     proposals,
     isBackendConnected,
+    refreshProposals,
   };
 }

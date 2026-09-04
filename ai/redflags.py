@@ -5,4 +5,9 @@ from ai.prompts import PROMPTS
 
 def check_redflags(proposal: dict) -> list[dict]:
     result = call_groq(PROMPTS["redflags_system"], f"Proposal: {json.dumps(proposal)}", model="openai/gpt-oss-20b")
-    return safe_json_parse(result)
+    parsed = safe_json_parse(result)
+    if isinstance(parsed, dict):
+        # The model sometimes returns a single flag object instead of an
+        # array of one when there's exactly one red flag.
+        return [parsed] if parsed else []
+    return parsed if isinstance(parsed, list) else []

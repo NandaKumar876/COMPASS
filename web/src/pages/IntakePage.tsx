@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { submitIntake } from '../api/client';
 
@@ -8,10 +8,8 @@ import { submitIntake } from '../api/client';
 const DEMO_RAW_TEXTS = [
   'Women empowerment through handicrafts by Self Employed Women\'s Association in Gujarat. Roughly 18.5 lakh rupees requested to train about 2200 women in traditional handicraft production over a year.',
   'Mobile veterinary units for pastoralist communities in Rajasthan, run by BAIF Development Research. Asking for 27 lakhs, expected to reach 8000 herders, but the budget breakdown looks thin and timeline is unclear.',
-  'Watershed management program on the Deccan Plateau in Maharashtra by Watershed Organisation Trust. Requesting 41 lakhs to restore water tables for approximately 15000 people over 18 months, strong partner track record.',
   'Night school for migrant children in Maharashtra run by Pratham Mumbai. 9.8 lakh rupees for about 600 children, 9 month program, well-documented outcomes.',
   'Sickle cell screening drive in Chhattisgarh via a National Health Mission partner. 15 lakhs requested for 30000 people but the expected outcome is vague and there are no clear metrics.',
-  'Biogas units for dairy farmers in Karnataka by SKG Sangha. 32 lakh rupees for 1200 farmers, budget seems inflated relative to scope.',
 ];
 
 // Simulated extraction results — fallback only, used if the backend call fails
@@ -62,12 +60,17 @@ interface ExtractedRow {
   revealed: boolean;
 }
 
-export default function IntakePage() {
+interface IntakePageProps {
+  onIntakeComplete?: () => void;
+}
+
+export default function IntakePage({ onIntakeComplete }: IntakePageProps) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [dragOver, setDragOver] = useState(false);
   const [rows, setRows] = useState<ExtractedRow[]>([]);
   const [progress, setProgress] = useState(0);
   const [fileCount, setFileCount] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fallback path — used only if the real backend call fails, so the demo
   // never hard-breaks on a dead network or missing GROQ_API_KEY.
@@ -110,11 +113,22 @@ export default function IntakePage() {
           );
         setFileCount(uploadFiles.length);
 
+        // Flip to "extracting" quickly — the Groq round-trip is the slow
+        // part, and that phase's copy ("Running LLM extraction pipeline")
+        // is what's actually true while we wait on it.
+        const extractingTimer = setTimeout(() => setPhase('extracting'), 500);
+
         // POST /intake only accepts one raw_text field, so multiple demo
         // blurbs go through as multiple small text files instead.
         const res = await submitIntake(uploadFiles);
         const extracted = res.extracted;
 
+        // The backend has already merged these into the live proposal pool
+        // by the time this response lands — refresh so All Proposals and
+        // Command Centre pick them up immediately.
+        onIntakeComplete?.();
+
+        clearTimeout(extractingTimer);
         setFileCount(extracted.length);
         setPhase('extracting');
 
@@ -146,7 +160,7 @@ export default function IntakePage() {
         simulateExtraction();
       }
     },
-    [simulateExtraction]
+    [simulateExtraction, onIntakeComplete]
   );
 
   const handleDrop = useCallback(
@@ -157,14 +171,32 @@ export default function IntakePage() {
       const dropped = Array.from(e.dataTransfer.files);
       if (dropped.length > 0) {
         runExtraction(dropped);
-      } else {
-        runExtraction(undefined, DEMO_RAW_TEXTS);
       }
     },
     [phase, runExtraction]
   );
 
+  // Real path — opens the OS file picker so a company can manually upload
+  // their own PDFs/docs, exactly like they would in production.
   const handleClick = useCallback(() => {
+    if (phase !== 'idle') return;
+    fileInputRef.current?.click();
+  }, [phase]);
+
+  const handleFileInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const selected = Array.from(e.target.files ?? []);
+      if (selected.length > 0) {
+        runExtraction(selected);
+      }
+      e.target.value = '';
+    },
+    [runExtraction]
+  );
+
+  // Demo path — separate, explicit button. Runs the same real /intake
+  // pipeline against canned proposal text, just without needing files on hand.
+  const handleRunDemo = useCallback(() => {
     if (phase !== 'idle') return;
     runExtraction(undefined, DEMO_RAW_TEXTS);
   }, [phase, runExtraction]);
@@ -216,36 +248,71 @@ export default function IntakePage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleDrop}
-            onClick={handleClick}
-            style={{
-              border: `2px dashed ${dragOver ? 'var(--accent-sage)' : 'var(--border-medium)'}`,
-              borderRadius: 20,
-              padding: '64px 40px',
-              textAlign: 'center',
-              cursor: 'pointer',
-              background: dragOver ? 'var(--accent-sage-subtle)' : 'var(--bg-elevated)',
-              transition: 'all 200ms ease',
-            }}
           >
-            <motion.div
-              animate={{ y: dragOver ? -4 : 0 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-              style={{ fontSize: '3rem', marginBottom: 16, opacity: 0.5 }}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.txt,.doc,.docx"
+              style={{ display: 'none' }}
+              onChange={handleFileInputChange}
+            />
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={handleClick}
+              style={{
+                border: `2px dashed ${dragOver ? 'var(--accent-sage)' : 'var(--border-medium)'}`,
+                borderRadius: 20,
+                padding: '64px 40px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                background: dragOver ? 'var(--accent-sage-subtle)' : 'var(--bg-elevated)',
+                transition: 'all 200ms ease',
+              }}
             >
-              ⬆
-            </motion.div>
-            <p style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-              Drop proposal files here
-            </p>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', maxWidth: 400, margin: '0 auto', lineHeight: 1.5 }}>
-              PDFs, Word documents, emails — any format. The AI layer extracts structured fields and flags red flags automatically.
-            </p>
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 16, fontWeight: 500 }}>
-              or click anywhere to run a demo extraction
-            </p>
+              <motion.div
+                animate={{ y: dragOver ? -4 : 0 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                style={{ fontSize: '3rem', marginBottom: 16, opacity: 0.5 }}
+              >
+                ⬆
+              </motion.div>
+              <p style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+                Upload proposal files
+              </p>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', maxWidth: 400, margin: '0 auto', lineHeight: 1.5 }}>
+                Drag & drop or click to browse. PDFs and text docs — the AI layer extracts structured fields and flags red flags automatically.
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--border-subtle)' }} />
+              <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>or</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--border-subtle)' }} />
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleRunDemo}
+              style={{
+                width: '100%',
+                padding: '18px 24px',
+                borderRadius: 16,
+                border: '1px dashed var(--border-medium)',
+                background: 'transparent',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-body)',
+                textAlign: 'center',
+              }}
+            >
+              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                ▷ Run demo with sample proposals
+              </span>
+              <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                No files needed — see the full pipeline run in seconds
+              </span>
+            </motion.button>
           </motion.div>
         )}
 
@@ -318,9 +385,10 @@ export default function IntakePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         >
-          <div className="card-header">
-            <h3>Extracted Proposals</h3>
-            {phase === 'done' && (
+          <div className="card-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+            <div style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3>Extracted Proposals</h3>
+              {phase === 'done' && (
               <motion.span
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -335,6 +403,12 @@ export default function IntakePage() {
               >
                 ✓ Extraction complete
               </motion.span>
+              )}
+            </div>
+            {phase === 'done' && (
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0 }}>
+                Added to the live portfolio — visible now in All Proposals and Command Centre.
+              </p>
             )}
           </div>
           <div style={{ overflowX: 'auto' }}>
